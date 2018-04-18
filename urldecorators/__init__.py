@@ -9,7 +9,15 @@ from urldecorators.helpers import get_decorator_tuple
 
 __all__ = ['include', 'url']
 
-include = urls.include
+
+def include(arg, namespace=None, app_name=None):
+    try:
+        return urls.include(arg, namespace=namespace, app_name=app_name)
+    except TypeError:
+        # Django2.0 removed the `app_name` parameter and asks to pass
+        # it inside a tuple (`arg`, `app_name`).
+        pass
+    return urls.include((arg, app_name), namespace=namespace)
 
 
 def url(regex, view, kwargs=None, name=None, prefix='', decorators=None,
@@ -43,20 +51,45 @@ def url(regex, view, kwargs=None, name=None, prefix='', decorators=None,
     r.decorators = get_decorator_tuple(decorators, middleware_classes)
     return r
 
+try:
+    from django.urls.resolvers import RegexPattern
 
-def _url(regex, view, kwargs=None, name=None, prefix='', decorators=None,
-         pattern=RegexURLPattern, resolver=RegexURLResolver):
-    """
-    Modified `django.conf.urls.url` with allows to specify custom
-    RegexURLPattern and RegexURLResolver classes.
-    """
-    if isinstance(view, (list,tuple)):
-        # For include(...) processing.
-        return resolver(regex, view[0], kwargs, *view[1:])
-    else:
-        if isinstance(view, six.string_types):
-            if not view:
-                raise ImproperlyConfigured('Empty URL pattern view name not permitted (for pattern %r)' % regex)
-            if prefix:
-                view = prefix + '.' + view
-        return pattern(regex, view, kwargs, name)
+    def _url(regex, view, kwargs=None, name=None, prefix=''):
+        if not view:
+            raise ImproperlyConfigured(
+                'Empty URL pattern view name not permitted (for pattern %r)'
+                % regex)
+        if isinstance(view, (list, tuple)):
+            # For include(...) processing.
+            pattern = RegexPattern(regex, is_endpoint=False)
+            urlconf_module, app_name, namespace = view
+            return RegexURLResolver(
+                pattern,
+                urlconf_module,
+                kwargs,
+                app_name=app_name,
+                namespace=namespace,
+            )
+        elif callable(view):
+            pattern = RegexPattern(regex, name=name, is_endpoint=True)
+            return RegexURLPattern(pattern, view, kwargs, name)
+        else:
+            raise TypeError('view must be a callable or a list/tuple in the case of include().')
+
+except ImportError:
+    def _url(regex, view, kwargs=None, name=None, prefix='', decorators=None,
+             pattern=RegexURLPattern, resolver=RegexURLResolver):
+        """
+        Modified `django.conf.urls.url` with allows to specify custom
+        RegexURLPattern and RegexURLResolver classes.
+        """
+        if isinstance(view, (list,tuple)):
+            # For include(...) processing.
+            return resolver(regex, view[0], kwargs, *view[1:])
+        else:
+            if isinstance(view, six.string_types):
+                if not view:
+                    raise ImproperlyConfigured('Empty URL pattern view name not permitted (for pattern %r)' % regex)
+                if prefix:
+                    view = prefix + '.' + view
+            return pattern(regex, view, kwargs, name)

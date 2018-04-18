@@ -1,6 +1,13 @@
 
 import types
-from django.core import urlresolvers as django_urlresolvers
+try:
+    from django.urls.resolvers import URLPattern as DjangoRegexURLPattern
+    from django.urls import URLResolver as DjangoRegexURLResolver
+except ImportError: # Django<2.0
+    from django.core.urlresolvers import (
+        RegexURLPattern as DjangoRegexURLPattern,
+        RegexURLResolver as DjangoRegexURLResolver
+    )
 from urldecorators.helpers import func_from_callable
 
 
@@ -33,13 +40,13 @@ class DecoratorMixin(object):
         return callback
 
 
-class RegexURLPattern(DecoratorMixin, django_urlresolvers.RegexURLPattern):
+class RegexURLPattern(DecoratorMixin, DjangoRegexURLPattern):
     """
     Django RegexURLPattern with support for decorating resolved views
     """
 
 
-class RegexURLResolver(DecoratorMixin, django_urlresolvers.RegexURLResolver):
+class RegexURLResolver(DecoratorMixin, DjangoRegexURLResolver):
     """
     Django RegexURLResolver with support for decorating resolved views
     """
