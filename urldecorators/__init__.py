@@ -17,7 +17,9 @@ def include(arg, namespace=None, app_name=None):
         # Django2.0 removed the `app_name` parameter and asks to pass
         # it inside a tuple (`arg`, `app_name`).
         pass
-    return urls.include((arg, app_name), namespace=namespace)
+    if not isinstance(arg, tuple):
+        arg = (arg, app_name)
+    return urls.include(arg, namespace=namespace)
 
 
 def url(regex, view, kwargs=None, name=None, prefix='', decorators=None,
